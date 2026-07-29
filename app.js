@@ -504,59 +504,92 @@ function connectToGame(code) {
     return;
   }
 
+  // Clean up any existing peer before creating a new one for joining
+  if (peer) {
+    peer.destroy();
+    peer = null;
+  }
+
   isHostSession = false;
   mySymbol = 'O';
   opponentSymbol = 'X';
-  startPeer(null, false);
-  connection = peer.connect(normalizedCode);
-  connection.on('open', () => {
-    connection.send({ type: 'player-info', name: playerName });
-    setStatus('Connected!');
-    showActiveGameUi();
+
+  setStatus('Connecting to the game...');
+
+  // Create a fresh Peer with auto-generated ID (for joining, we need random ID)
+  peer = new Peer(null);
+
+  peer.on('open', () => {
+    myId = peer.id;
     updatePlayerInfoDisplay();
-    opponentName = opponentName || 'Opponent';
-    updateScoreCard();
-    resetGame();
+
+    // Peer is now ready - connect to the host's game code
+    connection = peer.connect(normalizedCode, { reliable: true });
+
+    connection.on('open', () => {
+      // Send player info first so host knows who joined
+      connection.send({ type: 'player-info', name: playerName });
+      setStatus('Connected!');
+      showActiveGameUi();
+      updatePlayerInfoDisplay();
+      opponentName = opponentName || 'Opponent';
+      updateScoreCard();
+      turnInfo.textContent = 'Your turn';
+      myTurn = false;
+      resetGame();
+    });
+
+    connection.on('data', (data) => {
+      if (data.type === 'player-info') {
+        opponentName = data.name;
+        updatePlayerInfoDisplay();
+        updateScoreCard();
+        return;
+      }
+
+      if (data.type === 'move') {
+        board[data.index] = opponentSymbol;
+        myTurn = true;
+        turnInfo.textContent = 'Your turn';
+        renderBoard();
+      }
+
+      if (data.type === 'game-over') {
+        board = data.board;
+        const result = checkWinner(board);
+        winningLine = result.line;
+        lastWinner = result.winner;
+        winHighlightType = 'opponent';
+        gameOver = true;
+        nextStarter = data.winner;
+        showCelebration('😢 Loss');
+        updateScoreAfterRound('loss');
+        setStatus('Your opponent won.');
+        renderBoard();
+      }
+
+      if (data.type === 'draw') {
+        board = data.board;
+        gameOver = true;
+        winHighlightType = null;
+        showCelebration('✨ Draw');
+        updateScoreAfterRound('draw');
+        setStatus('It is a draw.');
+        renderBoard();
+      }
+    });
+
+    connection.on('error', (err) => {
+      console.error('Connection error:', err);
+      setStatus('Could not connect. Please check the code and try again.');
+      connection = null;
+    });
   });
 
-  connection.on('data', (data) => {
-    if (data.type === 'player-info') {
-      opponentName = data.name;
-      updatePlayerInfoDisplay();
-      updateScoreCard();
-      return;
-    }
-
-    if (data.type === 'move') {
-      board[data.index] = opponentSymbol;
-      myTurn = true;
-      turnInfo.textContent = 'Your turn';
-      renderBoard();
-    }
-
-    if (data.type === 'game-over') {
-      board = data.board;
-      const result = checkWinner(board);
-      winningLine = result.line;
-      lastWinner = result.winner;
-      winHighlightType = 'opponent';
-      gameOver = true;
-      nextStarter = data.winner;
-      showCelebration('😢 Loss');
-      updateScoreAfterRound('loss');
-      setStatus('Your opponent won.');
-      renderBoard();
-    }
-
-    if (data.type === 'draw') {
-      board = data.board;
-      gameOver = true;
-      winHighlightType = null;
-      showCelebration('✨ Draw');
-      updateScoreAfterRound('draw');
-      setStatus('It is a draw.');
-      renderBoard();
-    }
+  peer.on('error', (err) => {
+    console.error('Peer error:', err);
+    setStatus('Could not connect. Please check the code and try again.');
+    connection = null;
   });
 }
 
