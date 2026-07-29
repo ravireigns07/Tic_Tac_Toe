@@ -2,17 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Tic Tac Toe</title>
-    <link rel="stylesheet" href="./styles.css?v=2" />
+    <link rel="stylesheet" href="./styles.css?v=3" />
   </head>
   <body>
     <main class="app">
-      <h1>Tic Tac Toe</h1>
+      <h1>🎮 Tic Tac Toe</h1>
 
       <section id="setupPanel" class="panel">
         <label for="nameInput">Enter your name to start</label>
-        <input id="nameInput" maxlength="20" placeholder="Your name" />
+        <input id="nameInput" maxlength="20" placeholder="Your name" autocomplete="off" />
         <div class="controls" style="margin-top: 12px;">
           <button id="nameSubmitBtn">Start Game</button>
         </div>
@@ -20,25 +20,30 @@
       </section>
 
       <section id="gamePanel" class="panel hidden">
+        <p class="subtitle" style="margin:0 0 12px;font-size:0.95rem;">Play online or vs Computer</p>
         <div class="controls">
-          <button id="createBtn">Generate &amp; Share Code</button>
-          <button id="joinBtn">Join Game</button>
-          <button id="soloBtn">Play vs Computer</button>
-          <button id="resetBtn" class="secondary">Reset</button>
+          <button id="createBtn">🎲 Create Game</button>
+          <button id="joinBtn">🔗 Join Game</button>
+          <button id="soloBtn">🤖 vs Computer</button>
+          <button id="resetBtn" class="secondary">↺ Reset</button>
         </div>
 
-        <label id="codeLabel" for="codeInput" class="hidden">Paste your friend’s game code</label>
+        <label id="codeLabel" for="codeInput" class="hidden">Enter your friend's game code</label>
         <div class="code-input-row hidden" id="codeInputRow">
-          <input id="codeInput" maxlength="6" placeholder="Paste game code here" />
-          <button id="enterBtn" class="secondary enter-btn hidden">Enter</button>
+          <input id="codeInput" maxlength="6" placeholder="Enter code" autocomplete="off" inputmode="text" />
+          <button id="enterBtn" class="enter-btn hidden">Join</button>
         </div>
-        <div id="shareCodeBox" class="share-code-box hidden">Share code will appear here</div>
-        <p id="status" class="status">Create a game to get your code, or play alone against the computer.</p>
+        <div id="shareCodeBox" class="share-code-box hidden">
+          <div class="share-code-label">🎯 Share this code with your friend</div>
+          <div class="share-code-value" id="shareCodeValue"></div>
+          <button id="copyCodeBtn" class="copy-btn">📋 Copy Code</button>
+        </div>
+        <p id="status" class="status">Create a game to get your code, or join with a friend's code.</p>
       </section>
 
       <section id="gameCard" class="game-card hidden">
         <div class="game-card-top">
-          <button id="exitBtn" class="secondary hidden">Exit</button>
+          <button id="exitBtn" class="secondary">✕ Exit</button>
         </div>
         <div class="info-bar">
           <span id="turnInfo">Waiting for a game...</span>
@@ -52,12 +57,10 @@
           <div class="score-middle">
             <div>Draws</div>
             <div id="scoreSummary">0</div>
-          </div>
           <div class="score-player">
             <strong id="opponentNameLabel">Opponent</strong>
             <span id="opponentScore">0</span>
           </div>
-        </div>
         <div class="board" id="board">
           <button class="cell" data-index="0"></button>
           <button class="cell" data-index="1"></button>
@@ -72,7 +75,7 @@
       </section>
     </main>
 
-    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
-    <script src="./app.js?v=2"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="./app.js?v=3"></script>
   </body>
 </html>

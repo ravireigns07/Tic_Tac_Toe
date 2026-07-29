@@ -7,6 +7,8 @@ const codeInput = document.getElementById('codeInput');
 const codeInputRow = document.getElementById('codeInputRow');
 const codeLabel = document.getElementById('codeLabel');
 const shareCodeBox = document.getElementById('shareCodeBox');
+const shareCodeValue = document.getElementById('shareCodeValue');
+const copyCodeBtn = document.getElementById('copyCodeBtn');
 const statusEl = document.getElementById('status');
 const turnInfo = document.getElementById('turnInfo');
 const playerInfo = document.getElementById('playerInfo');
@@ -51,6 +53,7 @@ const PEER_OPTIONS = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
       {
         urls: 'turn:openrelay.metered.ca:80',
         username: 'openrelayproject',
@@ -67,8 +70,19 @@ const PEER_OPTIONS = {
         credential: 'openrelayproject',
       },
     ],
+    iceTransportPolicy: 'all',
   },
 };
+
+function showToast(message) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
 
 function setStatus(message) {
   statusEl.textContent = message;
@@ -106,12 +120,13 @@ function hideJoinInput() {
 }
 
 function showShareCode(code) {
-  shareCodeBox.textContent = code;
+  shareCodeValue.textContent = code;
   shareCodeBox.classList.remove('hidden');
+  copyCodeBtn.classList.remove('hidden');
 }
 
 function hideShareCode() {
-  shareCodeBox.textContent = '';
+  shareCodeValue.textContent = '';
   shareCodeBox.classList.add('hidden');
 }
 
@@ -153,7 +168,10 @@ function showHomeUi() {
   playerName = '';
   nameInput.value = '';
   connection = null;
-  peer = null;
+  if (peer) {
+    peer.destroy();
+    peer = null;
+  }
   myId = '';
   gameCode = '';
   opponentName = 'Opponent';
@@ -410,7 +428,7 @@ function startPeer(peerId = null, updateCodeField = false) {
     myId = id;
     gameCode = id;
     if (updateCodeField) {
-      setStatus('Your game code is ready. Share it with your friend.');
+      setStatus('Game created! Share the code with your friend.');
     } else {
       setStatus('Connecting to the game...');
     }
@@ -418,11 +436,11 @@ function startPeer(peerId = null, updateCodeField = false) {
   });
 
   peer.on('error', (err) => {
-    console.error(err);
+    console.error('Peer error:', err);
     if (err.type === 'unavailable') {
-      setStatus('This code is already taken. Please try another one.');
+      setStatus('This code is already taken. Please try again.');
     } else {
-      setStatus('Could not start the game.');
+      setStatus('Connection issue. Please try again.');
     }
   });
 
@@ -514,9 +532,40 @@ createBtn.addEventListener('click', () => {
   const generatedCode = generateGameCode();
   gameCode = generatedCode;
   showShareCode(generatedCode);
-  setStatus('Game created. Share this code with your friend.');
+  setStatus('Game created! Share this code with your friend.');
   startPeer(generatedCode, true);
 });
+
+// Copy code to clipboard (works on mobile)
+copyCodeBtn.addEventListener('click', () => {
+  const code = shareCodeValue.textContent;
+  if (!code) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => {
+      showToast('Code copied! Share it with your friend.');
+    }).catch(() => {
+      fallbackCopy(code);
+    });
+  } else {
+    fallbackCopy(code);
+  }
+});
+
+function fallbackCopy(text) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    showToast('Code copied! Share it with your friend.');
+  } catch (e) {
+    showToast('Tap and hold to copy the code.');
+  }
+  document.body.removeChild(textarea);
+}
 
 function connectToGame(code) {
   const normalizedCode = normalizeGameCode(code);
@@ -529,7 +578,7 @@ function connectToGame(code) {
     return;
   }
 
-  // Clean up any existing peer before creating a new one for joining
+  // Clean up any existing peer
   if (peer) {
     peer.destroy();
     peer = null;
@@ -539,20 +588,19 @@ function connectToGame(code) {
   mySymbol = 'O';
   opponentSymbol = 'X';
 
-  setStatus('Connecting to the game...');
+  setStatus('Connecting to game...');
 
-  // Create a fresh Peer with auto-generated ID (for joining, we need random ID)
+  // Create fresh Peer with auto-generated ID for joining
   peer = new Peer(null, PEER_OPTIONS);
 
   peer.on('open', () => {
     myId = peer.id;
     updatePlayerInfoDisplay();
 
-    // Peer is now ready - connect to the host's game code
+    // Peer is ready - connect to host's code
     connection = peer.connect(normalizedCode, { reliable: true });
 
     connection.on('open', () => {
-      // Send player info first so host knows who joined
       connection.send({ type: 'player-info', name: playerName });
       setStatus('Connected!');
       showActiveGameUi();
