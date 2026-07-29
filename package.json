@@ -1,0 +1,17 @@
+{
+  "name": "tic-tac-toe-online",
+  "version": "1.0.0",
+  "description": "Online two-player tic tac toe",
+  "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.6.0"
+  }
+}
