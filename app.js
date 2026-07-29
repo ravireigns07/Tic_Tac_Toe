@@ -45,6 +45,31 @@ let lastWinner = null;
 let winHighlightType = null;
 let nextStarter = 'X';
 
+// PeerJS config with STUN/TURN servers for mobile & cross-network connectivity
+const PEER_OPTIONS = {
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+    ],
+  },
+};
+
 function setStatus(message) {
   statusEl.textContent = message;
 }
@@ -380,7 +405,7 @@ function getBestMove(symbol) {
 
 function startPeer(peerId = null, updateCodeField = false) {
   const idToUse = peerId || generateGameCode();
-  peer = new Peer(idToUse);
+  peer = new Peer(idToUse, PEER_OPTIONS);
   peer.on('open', (id) => {
     myId = id;
     gameCode = id;
@@ -517,7 +542,7 @@ function connectToGame(code) {
   setStatus('Connecting to the game...');
 
   // Create a fresh Peer with auto-generated ID (for joining, we need random ID)
-  peer = new Peer(null);
+  peer = new Peer(null, PEER_OPTIONS);
 
   peer.on('open', () => {
     myId = peer.id;
