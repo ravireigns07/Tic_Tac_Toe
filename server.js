@@ -39,6 +39,7 @@ function createRoom(playerOne, playerTwo) {
     currentPlayer: 'X',
     status: 'playing',
     winner: null,
+    lastWinner: null,
     message: 'The game has started!',
   };
 
@@ -263,6 +264,7 @@ io.on('connection', (socket) => {
     if (winner) {
       room.status = 'finished';
       room.winner = winner;
+      room.lastWinner = winner;
       room.message = `${winner === 'X' ? 'X' : 'O'} wins!`;
       io.to(roomId).emit('gameState', {
         roomId,
@@ -275,10 +277,10 @@ io.on('connection', (socket) => {
 
       setTimeout(() => {
         room.board = Array(9).fill('');
-        room.currentPlayer = 'X';
         room.status = 'playing';
         room.winner = null;
-        room.message = 'Next round starting... X goes first.';
+        room.currentPlayer = room.lastWinner || 'X';
+        room.message = `Next round starting... ${room.currentPlayer} goes first.`;
         io.to(roomId).emit('gameState', {
           roomId,
           board: room.board,
@@ -305,10 +307,10 @@ io.on('connection', (socket) => {
 
       setTimeout(() => {
         room.board = Array(9).fill('');
-        room.currentPlayer = 'X';
         room.status = 'playing';
         room.winner = null;
-        room.message = 'Next round starting... X goes first.';
+        room.currentPlayer = room.lastWinner || 'X';
+        room.message = `Next round starting... ${room.currentPlayer} goes first.`;
         io.to(roomId).emit('gameState', {
           roomId,
           board: room.board,
