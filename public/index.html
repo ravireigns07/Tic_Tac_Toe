@@ -2,18 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Tic Tac Toe Online</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="app">
-      <h1>Tic Tac Toe Online</h1>
-      <p class="subtitle">Play head-to-head with another player in real time.</p>
+      <h1>🎮 Tic Tac Toe</h1>
+      <p class="subtitle">Play with a friend using a share code</p>
 
       <section id="setupPanel" class="panel">
         <label for="nameInput">Enter your name to start</label>
-        <input id="nameInput" maxlength="20" placeholder="Your name" />
+        <input id="nameInput" maxlength="20" placeholder="Your name" autocomplete="off" />
         <div class="controls" style="margin-top: 12px;">
           <button id="nameSubmitBtn">Start Game</button>
         </div>
@@ -22,18 +22,30 @@
 
       <section id="gamePanel" class="panel hidden">
         <div class="controls">
-          <button id="joinBtn">Find Match</button>
-          <button id="resetBtn" class="secondary">Reset</button>
+          <button id="createBtn">🎲 Create Game</button>
+          <button id="joinBtn">🔗 Join Game</button>
+          <button id="soloBtn">🤖 vs Computer</button>
         </div>
-        <p id="status" class="status">Enter a name to start playing.</p>
+
+        <label id="codeLabel" for="codeInput" class="hidden">Enter your friend's game code</label>
+        <div class="code-input-row hidden" id="codeInputRow">
+          <input id="codeInput" maxlength="6" placeholder="Enter code" autocomplete="off" inputmode="text" />
+          <button id="enterBtn" class="enter-btn hidden">Join</button>
+        </div>
+        <div id="shareCodeBox" class="share-code-box hidden">
+          <div class="share-code-label">🎯 Share this code with your friend</div>
+          <div class="share-code-value" id="shareCodeValue"></div>
+          <button id="copyCodeBtn" class="copy-btn">📋 Copy Code</button>
+        </div>
+        <p id="status" class="status">Create a game to get your code, or join with a friend's code.</p>
       </section>
 
       <section id="gameCard" class="game-card hidden">
         <div class="game-card-top">
-          <button id="exitBtn" class="secondary hidden">Exit</button>
+          <button id="exitBtn" class="secondary">✕ Exit</button>
         </div>
         <div class="info-bar">
-          <span id="turnInfo">Waiting for a match...</span>
+          <span id="turnInfo">Waiting for a game...</span>
           <span id="playerInfo">You: —</span>
         </div>
         <div id="scoreCard" class="score-card">
