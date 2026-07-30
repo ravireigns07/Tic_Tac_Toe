@@ -1,8 +1,9 @@
+const socket = io({ transports: ['websocket', 'polling'] });
+
 const createBtn = document.getElementById('createBtn');
 const joinBtn = document.getElementById('joinBtn');
 const enterBtn = document.getElementById('enterBtn');
 const soloBtn = document.getElementById('soloBtn');
-const resetBtn = document.getElementById('resetBtn');
 const codeInput = document.getElementById('codeInput');
 const codeInputRow = document.getElementById('codeInputRow');
 const codeLabel = document.getElementById('codeLabel');
@@ -26,53 +27,18 @@ const opponentScoreEl = document.getElementById('opponentScore');
 const scoreSummaryEl = document.getElementById('scoreSummary');
 const cells = Array.from(document.querySelectorAll('.cell'));
 
-let peer;
-let connection;
-let myId = '';
-let gameCode = '';
+let game = null;
+let playerSymbol = null;
 let playerName = '';
-let mySymbol = 'X';
-let opponentSymbol = 'O';
-let board = Array(9).fill('');
-let myTurn = true;
-let gameOver = false;
 let opponentName = 'Opponent';
-let isSoloMode = false;
-let isHostSession = false;
 let myWins = 0;
 let opponentWins = 0;
 let draws = 0;
+let gameOver = false;
 let winningLine = [];
-let lastWinner = null;
 let winHighlightType = null;
+let isSoloMode = false;
 let nextStarter = 'X';
-
-// PeerJS config with STUN/TURN servers for mobile & cross-network connectivity
-const PEER_OPTIONS = {
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-    ],
-    iceTransportPolicy: 'all',
-  },
-};
 
 function showToast(message) {
   const existing = document.querySelector('.toast');
@@ -86,15 +52,6 @@ function showToast(message) {
 
 function setStatus(message) {
   statusEl.textContent = message;
-}
-
-function generateGameCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i += 1) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
 }
 
 function normalizeGameCode(value) {
@@ -137,7 +94,7 @@ function updateScoreCard() {
     return;
   }
   myScoreEl.textContent = myWins;
-  opponentScoreEl.textContent = isSoloMode ? opponentWins : opponentWins;
+  opponentScoreEl.textContent = opponentWins;
   scoreSummaryEl.textContent = draws;
 }
 
@@ -146,9 +103,8 @@ function updatePlayerInfoDisplay() {
     playerInfo.textContent = `You: ${playerName} (X) | Computer: O`;
     return;
   }
-
-  const otherName = opponentName || 'Opponent';
-  playerInfo.textContent = `You: ${playerName} (${mySymbol}) | ${otherName} (${opponentSymbol})`;
+  const symbol = playerSymbol || '?';
+  playerInfo.textContent = `You: ${playerName} (${symbol}) | ${opponentName} (${symbol === 'X' ? 'O' : 'X'})`;
 }
 
 function showActiveGameUi() {
@@ -167,28 +123,19 @@ function showHomeUi() {
   setStatus('');
   playerName = '';
   nameInput.value = '';
-  connection = null;
-  if (peer) {
-    peer.destroy();
-    peer = null;
-  }
-  myId = '';
-  gameCode = '';
+  game = null;
+  playerSymbol = null;
   opponentName = 'Opponent';
   myWins = 0;
   opponentWins = 0;
   draws = 0;
-  board = Array(9).fill('');
   gameOver = false;
   winningLine = [];
-  lastWinner = null;
   winHighlightType = null;
-  myTurn = true;
   isSoloMode = false;
-  isHostSession = false;
-  mySymbol = 'X';
-  opponentSymbol = 'O';
   nextStarter = 'X';
+  hideShareCode();
+  hideJoinInput();
   updateScoreCard();
   renderBoard();
 }
@@ -210,296 +157,156 @@ function startGameUi() {
   updateScoreCard();
   hideShareCode();
   hideJoinInput();
-  setStatus('Choose a mode to begin.');
+  setStatus('Create a game or join with a code.');
 }
 
 function renderBoard() {
   cells.forEach((cell, index) => {
-    cell.textContent = board[index];
+    if (game && !isSoloMode) {
+      cell.textContent = game.board[index] || '';
+    } else if (isSoloMode) {
+      cell.textContent = soloBoard[index] || '';
+    } else {
+      cell.textContent = '';
+    }
     cell.classList.toggle('winning-cell', winningLine.includes(index));
     cell.classList.toggle('my-win', winningLine.includes(index) && winHighlightType === 'mine');
     cell.classList.toggle('opponent-win', winningLine.includes(index) && winHighlightType === 'opponent');
-    cell.disabled = Boolean(board[index]) || gameOver || (!myTurn && !isSoloMode);
+    const occupied = isSoloMode ? Boolean(soloBoard[index]) : (game && Boolean(game.board[index]));
+    const active = isSoloMode ? !soloGameOver : (game && game.status === 'playing');
+    const myTurn = isSoloMode ? soloMyTurn : (game && game.currentPlayer === playerSymbol);
+    cell.disabled = !active || occupied || !myTurn;
   });
 }
 
-function showCelebration(message) {
-  turnInfo.textContent = message;
-}
+// ============ SOLO MODE (vs Computer) ============
+let soloBoard = Array(9).fill('');
+let soloMyTurn = true;
+let soloGameOver = false;
 
-function autoResetGame() {
-  setTimeout(() => {
-    resetGame();
-  }, 1200);
-}
-
-function resetGame() {
-  board = Array(9).fill('');
-  gameOver = false;
+function resetSoloGame() {
+  soloBoard = Array(9).fill('');
+  soloGameOver = false;
   winningLine = [];
-  lastWinner = null;
   winHighlightType = null;
-  myTurn = mySymbol === nextStarter;
+  soloMyTurn = true;
   updateScoreCard();
-  if (isSoloMode) {
-    turnInfo.textContent = myTurn ? 'Your turn' : 'Computer turn';
-  } else {
-    turnInfo.textContent = myTurn ? 'Your turn' : 'Opponent turn';
-  }
+  turnInfo.textContent = 'Your turn';
   renderBoard();
-  if (isSoloMode && !myTurn) {
-    setTimeout(makeComputerMove, 600);
-  }
 }
 
-function checkWinner(boardState = board) {
-  const lines = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8],
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8],
-    [0, 4, 8],
-    [2, 4, 6],
-  ];
+function soloHandleMove(index) {
+  if (soloBoard[index] || soloGameOver || !soloMyTurn) return;
 
+  soloBoard[index] = 'X';
+  const result = checkWinner(soloBoard);
+  winningLine = result.line;
+  const winner = result.winner;
+  renderBoard();
+
+  if (winner) {
+    soloGameOver = true;
+    winHighlightType = 'mine';
+    myWins += 1;
+    turnInfo.textContent = '🎉 Joy!';
+    setStatus('You won!');
+    updateScoreCard();
+    setTimeout(resetSoloGame, 1200);
+    return;
+  }
+
+  if (soloBoard.every(Boolean)) {
+    soloGameOver = true;
+    draws += 1;
+    turnInfo.textContent = '✨ Draw';
+    setStatus('It is a draw.');
+    updateScoreCard();
+    setTimeout(resetSoloGame, 1200);
+    return;
+  }
+
+  soloMyTurn = false;
+  turnInfo.textContent = 'Computer thinking...';
+  setTimeout(makeComputerMove, 600);
+}
+
+function makeComputerMove() {
+  const emptyIndexes = soloBoard.map((v, i) => (v === '' ? i : -1)).filter((i) => i !== -1);
+  if (emptyIndexes.length === 0) return;
+
+  const winningMove = getBestSoloMove('O');
+  const blockingMove = getBestSoloMove('X');
+  let bestMove = null;
+
+  if (winningMove !== null) bestMove = winningMove;
+  else if (blockingMove !== null) bestMove = blockingMove;
+  else if (soloBoard[4] === '') bestMove = 4;
+  else bestMove = emptyIndexes[Math.floor(Math.random() * emptyIndexes.length)];
+
+  soloBoard[bestMove] = 'O';
+  const result = checkWinner(soloBoard);
+  winningLine = result.line;
+  const winner = result.winner;
+  renderBoard();
+
+  if (winner) {
+    soloGameOver = true;
+    winHighlightType = 'opponent';
+    opponentWins += 1;
+    turnInfo.textContent = '😢 Loss';
+    setStatus('Computer won.');
+    updateScoreCard();
+    setTimeout(resetSoloGame, 1200);
+    return;
+  }
+
+  if (soloBoard.every(Boolean)) {
+    soloGameOver = true;
+    draws += 1;
+    turnInfo.textContent = '✨ Draw';
+    setStatus('It is a draw.');
+    updateScoreCard();
+    setTimeout(resetSoloGame, 1200);
+    return;
+  }
+
+  soloMyTurn = true;
+  turnInfo.textContent = 'Your turn';
+  renderBoard();
+}
+
+function getBestSoloMove(symbol) {
+  const lines = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6],
+  ];
+  for (const [a, b, c] of lines) {
+    const vals = [soloBoard[a], soloBoard[b], soloBoard[c]];
+    const empties = [a, b, c].filter((i) => soloBoard[i] === '');
+    if (vals.filter((v) => v === symbol).length === 2 && empties.length === 1) {
+      return empties[0];
+    }
+  }
+  return null;
+}
+// ============ END SOLO MODE ============
+
+function checkWinner(boardState) {
+  const lines = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6],
+  ];
   for (const [a, b, c] of lines) {
     if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
       return { winner: boardState[a], line: [a, b, c] };
     }
   }
-
   return { winner: null, line: [] };
 }
 
-function updateScoreAfterRound(result) {
-  if (result === 'win') {
-    myWins += 1;
-  } else if (result === 'loss') {
-    opponentWins += 1;
-  } else if (result === 'draw') {
-    draws += 1;
-  }
-  updateScoreCard();
-}
-
-function handleMove(index) {
-  if (board[index] || gameOver || (!myTurn && !isSoloMode)) {
-    return;
-  }
-
-  board[index] = mySymbol;
-
-  const result = checkWinner();
-  winningLine = result.line;
-  lastWinner = result.winner;
-  const winner = result.winner;
-  renderBoard();
-
-  if (winner) {
-    gameOver = true;
-    winHighlightType = winner === mySymbol ? 'mine' : 'opponent';
-    if (winner === mySymbol) {
-      showCelebration('🎉 Joy!');
-    } else {
-      showCelebration('😢 Loss');
-    }
-    nextStarter = winner;
-    if (winner === mySymbol) {
-      updateScoreAfterRound('win');
-    } else {
-      updateScoreAfterRound('loss');
-    }
-    setStatus(winner === mySymbol ? 'You won!' : 'Computer won.');
-    if (!isSoloMode && connection) {
-      connection.send({ type: 'game-over', board, winner });
-    }
-    autoResetGame();
-    return;
-  }
-
-  if (board.every(Boolean)) {
-    gameOver = true;
-    showCelebration('✨ Draw');
-    updateScoreAfterRound('draw');
-    setStatus('It is a draw.');
-    if (!isSoloMode && connection) {
-      connection.send({ type: 'draw', board });
-    }
-    autoResetGame();
-    return;
-  }
-
-  if (isSoloMode) {
-    myTurn = false;
-    turnInfo.textContent = 'Computer thinking...';
-    setTimeout(makeComputerMove, 600);
-  } else {
-    myTurn = false;
-    turnInfo.textContent = 'Opponent turn';
-    connection.send({ type: 'move', index, board });
-  }
-}
-
-function makeComputerMove() {
-  const emptyIndexes = board.map((value, index) => (value === '' ? index : -1)).filter((index) => index !== -1);
-  if (emptyIndexes.length === 0) {
-    return;
-  }
-
-  const winningMove = getBestMove(opponentSymbol);
-  const blockingMove = getBestMove(mySymbol);
-  const centerMove = 4;
-
-  let bestMove = null;
-
-  if (winningMove !== null) {
-    bestMove = winningMove;
-  } else if (blockingMove !== null && board[centerMove] === '') {
-    bestMove = centerMove;
-  } else if (blockingMove !== null) {
-    bestMove = blockingMove;
-  } else if (board[centerMove] === '') {
-    bestMove = centerMove;
-  } else {
-    bestMove = emptyIndexes[Math.floor(Math.random() * emptyIndexes.length)];
-  }
-
-  board[bestMove] = opponentSymbol;
-
-  const result = checkWinner();
-  winningLine = result.line;
-  lastWinner = result.winner;
-  const winner = result.winner;
-  renderBoard();
-
-  if (winner) {
-    gameOver = true;
-    nextStarter = winner;
-    showCelebration('😢 Loss');
-    updateScoreAfterRound('loss');
-    setStatus('Computer won.');
-    autoResetGame();
-    return;
-  }
-
-  if (board.every(Boolean)) {
-    gameOver = true;
-    showCelebration('✨ Draw');
-    updateScoreAfterRound('draw');
-    setStatus('It is a draw.');
-    autoResetGame();
-    return;
-  }
-
-  myTurn = true;
-  turnInfo.textContent = 'Your turn';
-  renderBoard();
-}
-
-function getBestMove(symbol) {
-  const lines = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8],
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8],
-    [0, 4, 8],
-    [2, 4, 6],
-  ];
-
-  for (const [a, b, c] of lines) {
-    const values = [board[a], board[b], board[c]];
-    const empties = [a, b, c].filter((index) => board[index] === '');
-    if (values.filter((value) => value === symbol).length === 2 && empties.length === 1) {
-      return empties[0];
-    }
-  }
-
-  return null;
-}
-
-function startPeer(peerId = null, updateCodeField = false) {
-  const idToUse = peerId || generateGameCode();
-  peer = new Peer(idToUse, PEER_OPTIONS);
-  peer.on('open', (id) => {
-    myId = id;
-    gameCode = id;
-    if (updateCodeField) {
-      setStatus('Game created! Share the code with your friend.');
-    } else {
-      setStatus('Connecting to the game...');
-    }
-    updatePlayerInfoDisplay();
-  });
-
-  peer.on('error', (err) => {
-    console.error('Peer error:', err);
-    if (err.type === 'unavailable') {
-      setStatus('This code is already taken. Please try again.');
-    } else {
-      setStatus('Connection issue. Please try again.');
-    }
-  });
-
-  peer.on('connection', (conn) => {
-    connection = conn;
-    connection.on('open', () => {
-      connection.send({ type: 'player-info', name: playerName });
-    });
-    connection.on('data', (data) => {
-      if (data.type === 'player-info') {
-        opponentName = data.name;
-        updatePlayerInfoDisplay();
-        updateScoreCard();
-        return;
-      }
-
-      if (data.type === 'move') {
-        board[data.index] = opponentSymbol;
-        myTurn = true;
-        turnInfo.textContent = 'Your turn';
-        renderBoard();
-      }
-
-      if (data.type === 'game-over') {
-        board = data.board;
-        const result = checkWinner(board);
-        winningLine = result.line;
-        lastWinner = result.winner;
-        winHighlightType = 'opponent';
-        gameOver = true;
-        nextStarter = data.winner;
-        showCelebration('😢 Loss');
-        updateScoreAfterRound('loss');
-        setStatus('Your opponent won.');
-        renderBoard();
-      }
-
-      if (data.type === 'draw') {
-        board = data.board;
-        gameOver = true;
-        winHighlightType = null;
-        showCelebration('✨ Draw');
-        updateScoreAfterRound('draw');
-        setStatus('It is a draw.');
-        renderBoard();
-      }
-    });
-
-    showActiveGameUi();
-    setStatus('Connected! Your friend joined.');
-    updatePlayerInfoDisplay();
-    opponentName = opponentName || 'Opponent';
-    updateScoreCard();
-    turnInfo.textContent = 'Your turn';
-    myTurn = true;
-    resetGame();
-  });
-}
-
+// ============ EVENT LISTENERS ============
 nameSubmitBtn.addEventListener('click', startGameUi);
 nameInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
@@ -511,10 +318,6 @@ nameInput.addEventListener('keydown', (event) => {
 codeInput.addEventListener('input', () => {
   codeInput.value = normalizeGameCode(codeInput.value);
   updateEnterButtonVisibility();
-
-  if (!isHostSession && !isSoloMode && !connection && codeInput.value.length === 6) {
-    connectToGame(codeInput.value);
-  }
 });
 
 createBtn.addEventListener('click', () => {
@@ -524,147 +327,10 @@ createBtn.addEventListener('click', () => {
   }
 
   hideJoinInput();
-  isHostSession = true;
   isSoloMode = false;
-  mySymbol = 'X';
-  opponentSymbol = 'O';
-  nextStarter = 'X';
-  const generatedCode = generateGameCode();
-  gameCode = generatedCode;
-  showShareCode(generatedCode);
-  setStatus('Game created! Share this code with your friend.');
-  startPeer(generatedCode, true);
+  setStatus('Creating room...');
+  socket.emit('createRoom', { name: playerName });
 });
-
-// Copy code to clipboard (works on mobile)
-copyCodeBtn.addEventListener('click', () => {
-  const code = shareCodeValue.textContent;
-  if (!code) return;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(code).then(() => {
-      showToast('Code copied! Share it with your friend.');
-    }).catch(() => {
-      fallbackCopy(code);
-    });
-  } else {
-    fallbackCopy(code);
-  }
-});
-
-function fallbackCopy(text) {
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  try {
-    document.execCommand('copy');
-    showToast('Code copied! Share it with your friend.');
-  } catch (e) {
-    showToast('Tap and hold to copy the code.');
-  }
-  document.body.removeChild(textarea);
-}
-
-function connectToGame(code) {
-  const normalizedCode = normalizeGameCode(code);
-  if (!normalizedCode) {
-    setStatus('Enter a game code first.');
-    return;
-  }
-
-  if (connection) {
-    return;
-  }
-
-  // Clean up any existing peer
-  if (peer) {
-    peer.destroy();
-    peer = null;
-  }
-
-  isHostSession = false;
-  mySymbol = 'O';
-  opponentSymbol = 'X';
-
-  setStatus('Connecting to game...');
-
-  // Create fresh Peer with auto-generated ID for joining
-  peer = new Peer(null, PEER_OPTIONS);
-
-  peer.on('open', () => {
-    myId = peer.id;
-    updatePlayerInfoDisplay();
-
-    // Peer is ready - connect to host's code
-    connection = peer.connect(normalizedCode, { reliable: true });
-
-    connection.on('open', () => {
-      connection.send({ type: 'player-info', name: playerName });
-      setStatus('Connected!');
-      showActiveGameUi();
-      updatePlayerInfoDisplay();
-      opponentName = opponentName || 'Opponent';
-      updateScoreCard();
-      turnInfo.textContent = 'Your turn';
-      myTurn = false;
-      resetGame();
-    });
-
-    connection.on('data', (data) => {
-      if (data.type === 'player-info') {
-        opponentName = data.name;
-        updatePlayerInfoDisplay();
-        updateScoreCard();
-        return;
-      }
-
-      if (data.type === 'move') {
-        board[data.index] = opponentSymbol;
-        myTurn = true;
-        turnInfo.textContent = 'Your turn';
-        renderBoard();
-      }
-
-      if (data.type === 'game-over') {
-        board = data.board;
-        const result = checkWinner(board);
-        winningLine = result.line;
-        lastWinner = result.winner;
-        winHighlightType = 'opponent';
-        gameOver = true;
-        nextStarter = data.winner;
-        showCelebration('😢 Loss');
-        updateScoreAfterRound('loss');
-        setStatus('Your opponent won.');
-        renderBoard();
-      }
-
-      if (data.type === 'draw') {
-        board = data.board;
-        gameOver = true;
-        winHighlightType = null;
-        showCelebration('✨ Draw');
-        updateScoreAfterRound('draw');
-        setStatus('It is a draw.');
-        renderBoard();
-      }
-    });
-
-    connection.on('error', (err) => {
-      console.error('Connection error:', err);
-      setStatus('Could not connect. Please check the code and try again.');
-      connection = null;
-    });
-  });
-
-  peer.on('error', (err) => {
-    console.error('Peer error:', err);
-    setStatus('Could not connect. Please check the code and try again.');
-    connection = null;
-  });
-}
 
 joinBtn.addEventListener('click', () => {
   if (!playerName) {
@@ -674,7 +340,7 @@ joinBtn.addEventListener('click', () => {
 
   showJoinInput();
   updateEnterButtonVisibility();
-  setStatus('Paste your friend\'s game code to join.');
+  setStatus('Enter your friend\'s game code.');
 });
 
 enterBtn.addEventListener('click', () => {
@@ -687,8 +353,35 @@ enterBtn.addEventListener('click', () => {
     return;
   }
   hideShareCode();
-  connectToGame(codeInput.value.trim());
+  const code = codeInput.value.trim().toUpperCase();
+  setStatus('Joining game...');
+  socket.emit('joinRoom', { code, name: playerName });
 });
+
+// Copy code to clipboard
+copyCodeBtn.addEventListener('click', () => {
+  const code = shareCodeValue.textContent;
+  if (!code) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => {
+      showToast('✅ Code copied! Share it with your friend.');
+    }).catch(() => fallbackCopy(code));
+  } else {
+    fallbackCopy(code);
+  }
+});
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); showToast('✅ Code copied!'); }
+  catch (e) { showToast('Tap and hold to copy the code.'); }
+  document.body.removeChild(ta);
+}
 
 soloBtn.addEventListener('click', () => {
   if (!playerName) {
@@ -699,21 +392,16 @@ soloBtn.addEventListener('click', () => {
   showActiveGameUi();
   hideShareCode();
   hideJoinInput();
-  isHostSession = false;
   isSoloMode = true;
-  mySymbol = 'X';
-  opponentSymbol = 'O';
-  nextStarter = 'X';
-  connection = null;
   opponentName = 'Computer';
+  soloBoard = Array(9).fill('');
+  soloGameOver = false;
+  soloMyTurn = true;
+  winningLine = [];
+  winHighlightType = null;
   setStatus('Playing against the computer.');
   updatePlayerInfoDisplay();
-  resetGame();
-});
-
-resetBtn.addEventListener('click', () => {
-  setStatus('Game reset. Choose a mode to begin.');
-  resetGame();
+  resetSoloGame();
 });
 
 exitBtn.addEventListener('click', () => {
@@ -721,7 +409,136 @@ exitBtn.addEventListener('click', () => {
 });
 
 cells.forEach((cell, index) => {
-  cell.addEventListener('click', () => handleMove(index));
+  cell.addEventListener('click', () => {
+    if (isSoloMode) {
+      soloHandleMove(index);
+      return;
+    }
+
+    if (!game || game.status !== 'playing') return;
+    if (game.board[index]) return;
+    if (game.currentPlayer !== playerSymbol) {
+      setStatus('Wait for your turn.');
+      return;
+    }
+    socket.emit('makeMove', { roomId: game.roomId, index });
+  });
 });
 
+// ============ SOCKET EVENTS ============
+socket.on('connect', () => {
+  setStatus('Connected. Create a game or join with a code.');
+});
+
+socket.on('connect_error', () => {
+  setStatus('Connection issue. Please refresh and try again.');
+});
+
+socket.on('status', ({ message }) => {
+  setStatus(message);
+});
+
+socket.on('roomCreated', ({ code }) => {
+  showShareCode(code);
+  setStatus('Room created! Share the code with your friend.');
+});
+
+socket.on('gameStart', (payload) => {
+  isSoloMode = false;
+  game = {
+    roomId: payload.roomId,
+    board: payload.board,
+    currentPlayer: payload.currentPlayer,
+    status: payload.status,
+    winner: payload.winner,
+    message: payload.message,
+  };
+  playerSymbol = payload.symbol;
+  opponentName = payload.opponentName;
+  turnInfo.textContent = payload.message;
+  setStatus(`Playing against ${payload.opponentName}.`);
+  updatePlayerInfoDisplay();
+  updateScoreCard();
+  showActiveGameUi();
+  gameOver = false;
+  winningLine = [];
+  winHighlightType = null;
+  hideShareCode();
+  hideJoinInput();
+  renderBoard();
+});
+
+socket.on('gameState', (payload) => {
+  game = {
+    roomId: payload.roomId,
+    board: payload.board,
+    currentPlayer: payload.currentPlayer,
+    status: payload.status,
+    winner: payload.winner,
+    message: payload.message,
+  };
+
+  if (payload.status === 'finished') {
+    gameOver = true;
+    const winner = payload.winner;
+    if (winner === playerSymbol) {
+      winHighlightType = 'mine';
+      myWins += 1;
+      turnInfo.textContent = '🎉 Joy!';
+      setStatus('You won!');
+    } else {
+      winHighlightType = 'opponent';
+      opponentWins += 1;
+      turnInfo.textContent = '😢 Loss';
+      setStatus('Your opponent won.');
+    }
+    const result = checkWinner(payload.board);
+    winningLine = result ? result.line : [];
+    updateScoreCard();
+    renderBoard();
+    setTimeout(() => {
+      // Reset board visually for next round
+      game.board = Array(9).fill('');
+      game.status = 'playing';
+      game.currentPlayer = 'X';
+      gameOver = false;
+      winningLine = [];
+      winHighlightType = null;
+      turnInfo.textContent = 'Next round starting...';
+      renderBoard();
+    }, 1500);
+    return;
+  }
+
+  if (payload.status === 'draw') {
+    gameOver = true;
+    draws += 1;
+    winningLine = [];
+    winHighlightType = null;
+    turnInfo.textContent = '✨ Draw';
+    setStatus(payload.message);
+    updateScoreCard();
+    renderBoard();
+    setTimeout(() => {
+      game.board = Array(9).fill('');
+      game.status = 'playing';
+      game.currentPlayer = 'X';
+      gameOver = false;
+      winningLine = [];
+      winHighlightType = null;
+      turnInfo.textContent = 'Next round starting...';
+      renderBoard();
+    }, 1500);
+    return;
+  }
+
+  gameOver = false;
+  winningLine = [];
+  winHighlightType = null;
+  turnInfo.textContent = payload.currentPlayer === playerSymbol ? 'Your turn' : 'Opponent turn';
+  setStatus(payload.message);
+  renderBoard();
+});
+
+// Initial render
 renderBoard();

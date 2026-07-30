@@ -7,7 +7,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve root files (Socket.io version now)
+app.use(express.static(path.join(__dirname)));
 
 app.get('/health', (_req, res) => {
   res.status(200).send('ok');
@@ -15,6 +16,16 @@ app.get('/health', (_req, res) => {
 
 let waitingPlayer = null;
 const rooms = new Map();
+const roomCodes = new Map(); // code -> roomId mapping
+
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i += 1) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
 
 function createRoom(playerOne, playerTwo) {
   const roomId = `room-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -96,6 +107,7 @@ function checkWinner(board) {
 }
 
 io.on('connection', (socket) => {
+  // Existing queue-based matchmaking
   socket.on('joinQueue', ({ name }) => {
     const playerName = (name || '').trim() || `Player ${socket.id.slice(0, 4)}`;
     socket.data.name = playerName;
@@ -109,6 +121,119 @@ io.on('connection', (socket) => {
 
     waitingPlayer = { socket, name: playerName };
     socket.emit('status', { message: 'Waiting for another player...' });
+  });
+
+  // Code-based room creation (host)
+  socket.on('createRoom', ({ name }) => {
+    const playerName = (name || '').trim() || `Player ${socket.id.slice(0, 4)}`;
+    socket.data.name = playerName;
+
+    let code = generateRoomCode();
+    // Ensure unique code
+    while (roomCodes.has(code)) {
+      code = generateRoomCode();
+    }
+
+    const roomId = `code-room-${code}`;
+    const room = {
+      id: roomId,
+      code: code,
+      host: socket.id,
+      players: [
+        { id: socket.id, name: playerName, symbol: 'X' },
+      ],
+      board: Array(9).fill(''),
+      currentPlayer: 'X',
+      status: 'waiting', // waiting for opponent
+      winner: null,
+      message: 'Waiting for opponent to join...',
+    };
+
+    rooms.set(roomId, room);
+    roomCodes.set(code, roomId);
+    socket.join(roomId);
+    socket.data.roomId = roomId;
+
+    socket.emit('roomCreated', { code, roomId });
+    socket.emit('status', { message: 'Room created! Share the code with your friend.' });
+  });
+
+  // Code-based room joining (joiner)
+  socket.on('joinRoom', ({ code, name }) => {
+    const normalizedCode = (code || '').trim().toUpperCase().slice(0, 6);
+    if (!normalizedCode) {
+      socket.emit('status', { message: 'Please enter a valid code.' });
+      return;
+    }
+
+    const roomId = roomCodes.get(normalizedCode);
+    if (!roomId) {
+      socket.emit('status', { message: 'Invalid code. No room found.' });
+      return;
+    }
+
+    const room = rooms.get(roomId);
+    if (!room) {
+      socket.emit('status', { message: 'Room no longer exists.' });
+      roomCodes.delete(normalizedCode);
+      return;
+    }
+
+    if (room.status !== 'waiting') {
+      socket.emit('status', { message: 'Room is already full or game in progress.' });
+      return;
+    }
+
+    const playerName = (name || '').trim() || `Player ${socket.id.slice(0, 4)}`;
+    socket.data.name = playerName;
+
+    // Add joiner as player O
+    room.players.push({ id: socket.id, name: playerName, symbol: 'O' });
+    room.status = 'playing';
+    room.message = 'Game started! X goes first.';
+
+    socket.join(roomId);
+    socket.data.roomId = roomId;
+
+    // Notify both players
+    const hostPlayer = room.players[0];
+    const joinerPlayer = room.players[1];
+
+    io.to(hostPlayer.id).emit('gameStart', {
+      roomId,
+      board: room.board,
+      currentPlayer: room.currentPlayer,
+      symbol: 'X',
+      opponentName: playerName,
+      yourTurn: true,
+      status: room.status,
+      winner: room.winner,
+      message: 'Your opponent joined! You are X. Make the first move.',
+    });
+
+    io.to(joinerPlayer.id).emit('gameStart', {
+      roomId,
+      board: room.board,
+      currentPlayer: room.currentPlayer,
+      symbol: 'O',
+      opponentName: room.hostName || hostPlayer.name,
+      yourTurn: false,
+      status: room.status,
+      winner: room.winner,
+      message: 'You joined the game! You are O. Wait for your turn.',
+    });
+
+    // Store host name for reference
+    room.hostName = hostPlayer.name;
+
+    io.to(roomId).emit('gameState', {
+      roomId,
+      board: room.board,
+      currentPlayer: room.currentPlayer,
+      status: room.status,
+      winner: room.winner,
+      message: room.message,
+    });
   });
 
   socket.on('makeMove', ({ roomId, index }) => {
@@ -165,7 +290,7 @@ io.on('connection', (socket) => {
     }
 
     room.currentPlayer = room.currentPlayer === 'X' ? 'O' : 'X';
-    room.message = `${room.currentPlayer === 'X' ? 'X' : 'O'} turn`; 
+    room.message = `${room.currentPlayer === 'X' ? 'X' : 'O'} turn`;
     io.to(roomId).emit('gameState', {
       roomId,
       board: room.board,
@@ -177,6 +302,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    // Queue matchmaking
     if (waitingPlayer && waitingPlayer.socket.id === socket.id) {
       waitingPlayer = null;
       return;
@@ -190,6 +316,11 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) {
       return;
+    }
+
+    // If it's a code-based room, clean up the code mapping
+    if (room.code) {
+      roomCodes.delete(room.code);
     }
 
     const opponent = room.players.find((player) => player.id !== socket.id);

@@ -3,12 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Tic Tac Toe</title>
-    <link rel="stylesheet" href="./styles.css?v=3" />
+    <title>Tic Tac Toe Online</title>
+    <link rel="stylesheet" href="/styles.css?v=4" />
   </head>
   <body>
     <main class="app">
       <h1>🎮 Tic Tac Toe</h1>
+      <p class="subtitle">Play with a friend using a share code</p>
 
       <section id="setupPanel" class="panel">
         <label for="nameInput">Enter your name to start</label>
@@ -20,12 +21,10 @@
       </section>
 
       <section id="gamePanel" class="panel hidden">
-        <p class="subtitle" style="margin:0 0 12px;font-size:0.95rem;">Play online or vs Computer</p>
         <div class="controls">
           <button id="createBtn">🎲 Create Game</button>
           <button id="joinBtn">🔗 Join Game</button>
           <button id="soloBtn">🤖 vs Computer</button>
-          <button id="resetBtn" class="secondary">↺ Reset</button>
         </div>
 
         <label id="codeLabel" for="codeInput" class="hidden">Enter your friend's game code</label>
@@ -75,7 +74,7 @@
       </section>
     </main>
 
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <script src="./app.js?v=3"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js?v=4"></script>
   </body>
 </html>
