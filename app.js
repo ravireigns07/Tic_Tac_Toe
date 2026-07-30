@@ -1,4 +1,5 @@
-const socket = io({ transports: ['websocket', 'polling'] });
+const socket = (typeof io !== 'undefined' && io) ? io({ transports: ['websocket', 'polling'] }) : null;
+const multiplayerEnabled = Boolean(socket);
 
 const createBtn = document.getElementById('createBtn');
 const joinBtn = document.getElementById('joinBtn');
@@ -325,6 +326,10 @@ createBtn.addEventListener('click', () => {
     setStatus('Enter your name first.');
     return;
   }
+  if (!multiplayerEnabled) {
+    setStatus('Multiplayer unavailable. Use vs Computer.');
+    return;
+  }
 
   hideJoinInput();
   isSoloMode = false;
@@ -337,6 +342,10 @@ joinBtn.addEventListener('click', () => {
     setStatus('Enter your name first.');
     return;
   }
+  if (!multiplayerEnabled) {
+    setStatus('Multiplayer unavailable. Use vs Computer.');
+    return;
+  }
 
   showJoinInput();
   updateEnterButtonVisibility();
@@ -346,6 +355,10 @@ joinBtn.addEventListener('click', () => {
 enterBtn.addEventListener('click', () => {
   if (!playerName) {
     setStatus('Enter your name first.');
+    return;
+  }
+  if (!multiplayerEnabled) {
+    setStatus('Multiplayer unavailable. Use vs Computer.');
     return;
   }
   if (!codeInput.value.trim()) {
@@ -426,22 +439,124 @@ cells.forEach((cell, index) => {
 });
 
 // ============ SOCKET EVENTS ============
-socket.on('connect', () => {
-  setStatus('Connected. Create a game or join with a code.');
-});
+if (socket) {
+  socket.on('connect', () => {
+    setStatus('Connected. Create a game or join with a code.');
+  });
 
-socket.on('connect_error', () => {
-  setStatus('Connection issue. Please refresh and try again.');
-});
+  socket.on('connect_error', () => {
+    setStatus('Connection issue. Please refresh and try again.');
+  });
 
-socket.on('status', ({ message }) => {
-  setStatus(message);
-});
+  socket.on('status', ({ message }) => {
+    setStatus(message);
+  });
 
-socket.on('roomCreated', ({ code }) => {
-  showShareCode(code);
-  setStatus('Room created! Share the code with your friend.');
-});
+  socket.on('roomCreated', ({ code }) => {
+    showShareCode(code);
+    setStatus('Room created! Share the code with your friend.');
+  });
+
+  socket.on('gameStart', (payload) => {
+    isSoloMode = false;
+    game = {
+      roomId: payload.roomId,
+      board: payload.board,
+      currentPlayer: payload.currentPlayer,
+      status: payload.status,
+      winner: payload.winner,
+      message: payload.message,
+    };
+    playerSymbol = payload.symbol;
+    opponentName = payload.opponentName;
+    turnInfo.textContent = payload.message;
+    setStatus(`Playing against ${payload.opponentName}.`);
+    updatePlayerInfoDisplay();
+    updateScoreCard();
+    showActiveGameUi();
+    gameOver = false;
+    winningLine = [];
+    winHighlightType = null;
+    hideShareCode();
+    hideJoinInput();
+    renderBoard();
+  });
+
+  socket.on('gameState', (payload) => {
+    game = {
+      roomId: payload.roomId,
+      board: payload.board,
+      currentPlayer: payload.currentPlayer,
+      status: payload.status,
+      winner: payload.winner,
+      message: payload.message,
+    };
+
+    if (payload.status === 'finished') {
+      gameOver = true;
+      const winner = payload.winner;
+      if (winner === playerSymbol) {
+        winHighlightType = 'mine';
+        myWins += 1;
+        turnInfo.textContent = '🎉 Joy!';
+        setStatus('You won!');
+      } else {
+        winHighlightType = 'opponent';
+        opponentWins += 1;
+        turnInfo.textContent = '😢 Loss';
+        setStatus('Your opponent won.');
+      }
+      const result = checkWinner(payload.board);
+      winningLine = result ? result.line : [];
+      updateScoreCard();
+      renderBoard();
+      setTimeout(() => {
+        game.board = Array(9).fill('');
+        game.status = 'playing';
+        game.currentPlayer = 'X';
+        gameOver = false;
+        winningLine = [];
+        winHighlightType = null;
+        turnInfo.textContent = 'Next round starting...';
+        renderBoard();
+      }, 1500);
+      return;
+    }
+
+    if (payload.status === 'draw') {
+      gameOver = true;
+      draws += 1;
+      winningLine = [];
+      winHighlightType = null;
+      turnInfo.textContent = '✨ Draw';
+      setStatus(payload.message);
+      updateScoreCard();
+      renderBoard();
+      setTimeout(() => {
+        game.board = Array(9).fill('');
+        game.status = 'playing';
+        game.currentPlayer = 'X';
+        gameOver = false;
+        winningLine = [];
+        winHighlightType = null;
+        turnInfo.textContent = 'Next round starting...';
+        renderBoard();
+      }, 1500);
+      return;
+    }
+
+    gameOver = false;
+    winningLine = [];
+    winHighlightType = null;
+    turnInfo.textContent = payload.message;
+    setStatus('Game updated.');
+    updateScoreCard();
+    renderBoard();
+  });
+} else {
+  setStatus('Multiplayer unavailable on this host. Start game and use vs Computer.');
+}
+
 
 socket.on('gameStart', (payload) => {
   isSoloMode = false;

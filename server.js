@@ -7,8 +7,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve root files (Socket.io version now)
-app.use(express.static(path.join(__dirname)));
+// Serve frontend from public folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/health', (_req, res) => {
   res.status(200).send('ok');
