@@ -418,8 +418,18 @@ soloBtn.addEventListener('click', () => {
 });
 
 exitBtn.addEventListener('click', () => {
+  if (!isSoloMode && socket && game && game.roomId) {
+    socket.emit('leaveRoom', { roomId: game.roomId });
+  }
   showHomeUi();
 });
+
+if (socket) {
+  socket.on('playerLeft', () => {
+    setStatus('Your opponent exited the game. Returning to menu.');
+    showHomeUi();
+  });
+}
 
 cells.forEach((cell, index) => {
   cell.addEventListener('click', () => {

@@ -335,6 +335,21 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('leaveRoom', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    const opponent = room.players.find((player) => player.id !== socket.id);
+    if (opponent) {
+      io.to(opponent.id).emit('playerLeft');
+    }
+
+    if (room.code) {
+      roomCodes.delete(room.code);
+    }
+    rooms.delete(roomId);
+  });
+
   socket.on('disconnect', () => {
     // Queue matchmaking
     if (waitingPlayer && waitingPlayer.socket.id === socket.id) {
