@@ -272,6 +272,22 @@ io.on('connection', (socket) => {
         winner: room.winner,
         message: room.message,
       });
+
+      setTimeout(() => {
+        room.board = Array(9).fill('');
+        room.currentPlayer = 'X';
+        room.status = 'playing';
+        room.winner = null;
+        room.message = 'Next round starting... X goes first.';
+        io.to(roomId).emit('gameState', {
+          roomId,
+          board: room.board,
+          currentPlayer: room.currentPlayer,
+          status: room.status,
+          winner: room.winner,
+          message: room.message,
+        });
+      }, 1500);
       return;
     }
 
@@ -286,6 +302,22 @@ io.on('connection', (socket) => {
         winner: null,
         message: room.message,
       });
+
+      setTimeout(() => {
+        room.board = Array(9).fill('');
+        room.currentPlayer = 'X';
+        room.status = 'playing';
+        room.winner = null;
+        room.message = 'Next round starting... X goes first.';
+        io.to(roomId).emit('gameState', {
+          roomId,
+          board: room.board,
+          currentPlayer: room.currentPlayer,
+          status: room.status,
+          winner: room.winner,
+          message: room.message,
+        });
+      }, 1500);
       return;
     }
 
