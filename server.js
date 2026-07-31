@@ -145,6 +145,7 @@ io.on('connection', (socket) => {
       ],
       board: Array(9).fill(''),
       currentPlayer: 'X',
+      nextStarter: 'X',
       status: 'waiting', // waiting for opponent
       winner: null,
       message: 'Waiting for opponent to join...',
@@ -252,16 +253,23 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('sendChat', ({ roomId, message }) => {
+  socket.on('sendChat', ({ roomId, message }, callback) => {
     const room = rooms.get(roomId);
-    if (!room || !message || typeof message !== 'string') return;
+    if (!room || !message || typeof message !== 'string') {
+      if (typeof callback === 'function') callback({ success: false, message: 'Unable to send message.' });
+      return;
+    }
     const player = room.players.find((entry) => entry.id === socket.id);
-    if (!player) return;
+    if (!player) {
+      if (typeof callback === 'function') callback({ success: false, message: 'Not in the room.' });
+      return;
+    }
     const senderName = player.name || 'Player';
-    io.to(roomId).emit('chatMessage', {
+    socket.to(roomId).emit('chatMessage', {
       sender: senderName,
       message: message.slice(0, 200),
     });
+    if (typeof callback === 'function') callback({ success: true });
   });
 
   socket.on('makeMove', ({ roomId, index }) => {
@@ -291,7 +299,7 @@ io.on('connection', (socket) => {
     if (winner) {
       room.status = 'finished';
       room.winner = winner;
-      room.lastWinner = winner;
+      room.nextStarter = winner;
       room.message = `${winner === 'X' ? 'X' : 'O'} wins!`;
       io.to(roomId).emit('gameState', {
         roomId,
@@ -306,7 +314,7 @@ io.on('connection', (socket) => {
         room.board = Array(9).fill('');
         room.status = 'playing';
         room.winner = null;
-        room.currentPlayer = room.lastWinner || 'X';
+        room.currentPlayer = room.nextStarter || 'X';
         room.message = `Next round starting... ${room.currentPlayer} goes first.`;
         io.to(roomId).emit('gameState', {
           roomId,
@@ -336,7 +344,7 @@ io.on('connection', (socket) => {
         room.board = Array(9).fill('');
         room.status = 'playing';
         room.winner = null;
-        room.currentPlayer = room.lastWinner || 'X';
+        room.currentPlayer = room.currentPlayer === 'X' ? 'O' : 'X';
         room.message = `Next round starting... ${room.currentPlayer} goes first.`;
         io.to(roomId).emit('gameState', {
           roomId,
