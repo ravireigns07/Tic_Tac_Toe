@@ -383,6 +383,8 @@ io.on('connection', (socket) => {
       roomCodes.delete(room.code);
     }
     rooms.delete(roomId);
+    socket.leave(roomId);
+    socket.data.roomId = null;
   });
 
   socket.on('disconnect', () => {
@@ -409,9 +411,11 @@ io.on('connection', (socket) => {
 
     const opponent = room.players.find((player) => player.id !== socket.id);
     if (opponent) {
-      io.to(opponent.id).emit('status', { message: 'Your opponent left the game.' });
+      io.to(opponent.id).emit('playerLeft');
     }
     rooms.delete(roomId);
+    socket.leave(roomId);
+    socket.data.roomId = null;
   });
 });
 
