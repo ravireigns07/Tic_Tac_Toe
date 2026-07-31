@@ -1,4 +1,11 @@
-const socket = (typeof io !== 'undefined' && io) ? io({ transports: ['websocket', 'polling'] }) : null;
+const socketOptions = {
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelayMax: 3000,
+  timeout: 30000,
+};
+const socket = (typeof io !== 'undefined' && io) ? io(socketOptions) : null;
 const multiplayerEnabled = Boolean(socket);
 
 const createBtn = document.getElementById('createBtn');
@@ -193,7 +200,11 @@ function sendChatMessage() {
   const message = chatInput.value.trim();
   appendChatMessage('You', message, true);
   chatInput.value = '';
-  socket.emit('sendChat', { roomId: game.roomId, message });
+  socket.timeout(20000).emit('sendChat', { roomId: game.roomId, message }, (err, response) => {
+    if (err || !response || !response.success) {
+      setStatus('Message may not have been delivered. Network is slow.');
+    }
+  });
 }
 
 function showHomeUi() {
@@ -418,7 +429,19 @@ createBtn.addEventListener('click', () => {
   hideJoinInput();
   isSoloMode = false;
   setStatus('Creating room...');
-  socket.emit('createRoom', { name: playerName });
+  setMultiplayerLoading(true);
+  socket.timeout(20000).emit('createRoom', { name: playerName }, (err, response) => {
+    setMultiplayerLoading(false);
+    if (err) {
+      setStatus('Network slow. Could not create room yet. Try again.');
+      return;
+    }
+    if (!response || !response.success) {
+      setStatus(response?.message || 'Could not create room. Please try again.');
+      return;
+    }
+    setStatus(response.message || 'Room created! Share the code with your friend.');
+  });
 });
 
 joinBtn.addEventListener('click', () => {
@@ -576,7 +599,28 @@ if (socket) {
   });
 
   socket.on('connect_error', () => {
-    setStatus('Connection issue. Please refresh and try again.');
+    setStatus('Connection issue. Waiting to reconnect...');
+  });
+
+  socket.on('disconnect', (reason) => {
+    if (reason === 'io client disconnect') return;
+    setStatus('Disconnected. Trying to reconnect...');
+  });
+
+  socket.on('reconnect_attempt', (attempt) => {
+    setStatus(`Reconnecting... attempt ${attempt} of 10`);
+  });
+
+  socket.on('reconnect', () => {
+    setStatus('Reconnected. Waiting for game updates...');
+  });
+
+  socket.on('reconnect_failed', () => {
+    setStatus('Unable to reconnect. Please refresh and try again.');
+  });
+
+  socket.on('reconnect_error', () => {
+    setStatus('Reconnect failed. Network still slow.');
   });
 
   socket.on('status', ({ message }) => {
