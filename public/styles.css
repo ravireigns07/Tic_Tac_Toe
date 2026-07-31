@@ -36,13 +36,21 @@ h1 {
   color: #94a3b8;
 }
 
-.panel,
-.game-card {
+.panel {
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: rgba(30, 41, 59, 0.98);
   border-radius: 28px;
   padding: 24px;
   margin-bottom: 18px;
+}
+
+.game-card {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(71, 85, 105, 0.92);
+  border-radius: 28px;
+  padding: 24px;
+  margin-bottom: 18px;
+  color: #e2e8f0;
 }
 
 .game-card-top {
@@ -129,7 +137,7 @@ button:focus {
 .status {
   min-height: 24px;
   margin: 12px 0 0;
-  color: #60a5fa;
+  color: #3b82f6;
 }
 
 .code-input-row {
@@ -197,10 +205,10 @@ button:focus {
   grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr);
   gap: 6px;
   margin-bottom: 8px;
-  padding: 6px;
+  padding: 10px;
   border-radius: 16px;
-  background: rgba(38, 53, 78, 0.94);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(100, 116, 139, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.22);
 }
 
 .score-player {
@@ -209,17 +217,17 @@ button:focus {
   align-items: center;
   justify-content: center;
   min-width: 56px;
-  padding: 6px 8px;
+  padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(40, 53, 74, 0.96);
-  color: #f8fafc;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+  background: rgba(100, 116, 139, 0.18);
+  color: #e2e8f0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
 .score-player strong {
   font-size: 0.78rem;
   margin-bottom: 4px;
-  color: #cbd5e1;
+  color: #f8fafc;
 }
 
 .score-player span {
@@ -242,12 +250,12 @@ button:focus {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-radius: 14px;
-  background: rgba(40, 53, 74, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(100, 116, 139, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   text-align: center;
-  color: #cbd5e1;
+  color: #e2e8f0;
 }
 
 .score-middle div:first-child {
@@ -265,34 +273,59 @@ button:focus {
 }
 
 .board {
-  margin-top: 8px;
+  margin-top: 12px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
-.game-body {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 18px;
-  align-items: start;
+.chat-toggle {
+  margin-top: 14px;
+  width: 100%;
+  position: relative;
 }
 
-.chat-panel {
+.chat-toggle::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #ef4444;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.chat-toggle.chat-notify::after {
+  opacity: 1;
+}
+
+.chat-popup {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: min(360px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  z-index: 30;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 12px;
   padding: 18px;
-  min-height: 420px;
   border-radius: 24px;
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(71, 85, 105, 0.35);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
 }
 
-.chat-header {
+.chat-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   font-weight: 700;
-  color: #e2e8f0;
-  letter-spacing: 0.02em;
+  color: #f8fafc;
 }
 
 .chat-messages {
@@ -308,14 +341,14 @@ button:focus {
   gap: 4px;
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(30, 41, 59, 0.96);
+  background: rgba(30, 41, 59, 0.95);
   color: #e2e8f0;
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(71, 85, 105, 0.3);
 }
 
 .chat-message.own {
-  background: rgba(59, 130, 246, 0.14);
-  border-color: rgba(96, 165, 250, 0.24);
+  background: rgba(51, 65, 85, 0.95);
+  border-color: rgba(96, 165, 250, 0.4);
 }
 
 .chat-message strong {
@@ -350,7 +383,7 @@ button:focus {
   height: 42px;
   font-size: 1.15rem;
   border-radius: 14px;
-  background: rgba(30, 41, 59, 0.94);
+  background: rgba(241, 245, 255, 0.95);
   border: 1px solid rgba(148, 163, 184, 0.16);
 }
 
@@ -363,9 +396,9 @@ button:focus {
   border-radius: 18px;
   font-size: clamp(2.4rem, 8vw, 3.4rem);
   font-weight: 700;
-  background: linear-gradient(180deg, #1c2a42 0%, #152134 100%);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  color: #f8fafc;
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #e2e8f0;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -384,13 +417,13 @@ button:focus {
 }
 
 .cell.winning-cell.my-win {
-  color: #22c55e;
-  box-shadow: inset 0 0 0 2px #22c55e;
+  color: #15803d;
+  box-shadow: inset 0 0 0 2px #15803d;
 }
 
 .cell.winning-cell.opponent-win {
-  color: #ff4d4d;
-  box-shadow: inset 0 0 0 2px #ff4d4d;
+  color: #dc2626;
+  box-shadow: inset 0 0 0 2px #dc2626;
 }
 
 .cell:disabled {
@@ -424,12 +457,15 @@ button:focus {
     width: 100%;
   }
 
-  .game-body {
-    grid-template-columns: 1fr;
+  .chat-toggle {
+    width: 100%;
   }
 
-  .chat-panel {
-    min-height: auto;
+  .chat-popup {
+    position: static;
+    width: 100%;
+    max-height: none;
+    box-shadow: none;
   }
 
   .chat-input-row {

@@ -62,8 +62,7 @@
             <span id="opponentScore">0</span>
           </div>
         </div>
-        <div class="game-body">
-          <div class="board" id="board">
+        <div class="board" id="board">
           <button class="cell" data-index="0"></button>
           <button class="cell" data-index="1"></button>
           <button class="cell" data-index="2"></button>
@@ -75,21 +74,25 @@
           <button class="cell" data-index="8"></button>
         </div>
 
-          <aside id="chatPanel" class="chat-panel hidden">
-            <div class="chat-header">Game Chat</div>
-            <div id="chatMessages" class="chat-messages"></div>
-            <div class="emoji-picker" id="emojiPicker">
-              <button type="button">😀</button>
-              <button type="button">😂</button>
-              <button type="button">😍</button>
-              <button type="button">😎</button>
-              <button type="button">🎉</button>
-            </div>
-            <div class="chat-input-row">
-              <input id="chatInput" maxlength="120" placeholder="Send a message..." autocomplete="off" />
-              <button id="chatSendBtn">Send</button>
-            </div>
-          </aside>
+        <button id="chatToggleBtn" class="secondary chat-toggle hidden" type="button">💬 Chat</button>
+
+        <div id="chatPopup" class="chat-popup hidden">
+          <div class="chat-popup-header">
+            <span>Game Chat</span>
+            <button id="chatCloseBtn" class="secondary" type="button">Close</button>
+          </div>
+          <div id="chatMessages" class="chat-messages"></div>
+          <div class="emoji-picker" id="emojiPicker">
+            <button type="button">😀</button>
+            <button type="button">😂</button>
+            <button type="button">😍</button>
+            <button type="button">😎</button>
+            <button type="button">🎉</button>
+          </div>
+          <div class="chat-input-row">
+            <input id="chatInput" maxlength="120" placeholder="Send a message..." autocomplete="off" />
+            <button id="chatSendBtn" type="button">Send</button>
+          </div>
         </div>
       </section>
     </main>

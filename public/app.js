@@ -11,11 +11,13 @@ const codeLabel = document.getElementById('codeLabel');
 const shareCodeBox = document.getElementById('shareCodeBox');
 const shareCodeValue = document.getElementById('shareCodeValue');
 const copyCodeBtn = document.getElementById('copyCodeBtn');
-const chatPanel = document.getElementById('chatPanel');
+const chatToggleBtn = document.getElementById('chatToggleBtn');
+const chatPopup = document.getElementById('chatPopup');
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
 const emojiPicker = document.getElementById('emojiPicker');
+const chatCloseBtn = document.getElementById('chatCloseBtn');
 const statusEl = document.getElementById('status');
 const turnInfo = document.getElementById('turnInfo');
 const playerInfo = document.getElementById('playerInfo');
@@ -135,6 +137,7 @@ function showLobbyUi() {
   exitBtn.classList.add('hidden');
   hideShareCode();
   hideJoinInput();
+  setChatButtonVisible(false);
   setChatVisible(false);
   setStatus('Create a game or join with a code.');
   game = null;
@@ -151,12 +154,17 @@ function showLobbyUi() {
 }
 
 function setChatVisible(visible) {
-  if (!chatPanel) return;
-  chatPanel.classList.toggle('hidden', !visible);
-  if (!visible) {
-    chatMessages.innerHTML = '';
-    chatInput.value = '';
+  if (!chatPopup || !chatToggleBtn) return;
+  chatPopup.classList.toggle('hidden', !visible);
+  if (visible) {
+    chatToggleBtn.classList.remove('chat-notify');
   }
+  chatToggleBtn.classList.toggle('hidden', false);
+}
+
+function setChatButtonVisible(visible) {
+  if (!chatToggleBtn) return;
+  chatToggleBtn.classList.toggle('hidden', !visible);
 }
 
 function appendChatMessage(sender, message, own = false) {
@@ -183,9 +191,9 @@ function escapeHtml(text) {
 function sendChatMessage() {
   if (!chatInput || !chatInput.value.trim() || !socket || !game || !game.roomId) return;
   const message = chatInput.value.trim();
-  socket.emit('sendChat', { roomId: game.roomId, message });
   appendChatMessage('You', message, true);
   chatInput.value = '';
+  socket.emit('sendChat', { roomId: game.roomId, message });
 }
 
 function showHomeUi() {
@@ -208,6 +216,8 @@ function showHomeUi() {
   winningLine = [];
   winHighlightType = null;
   isSoloMode = false;
+  setChatButtonVisible(false);
+  setChatVisible(false);
   nextStarter = 'X';
   hideShareCode();
   hideJoinInput();
@@ -509,6 +519,8 @@ exitBtn.addEventListener('click', () => {
     socket.emit('leaveRoom', { roomId: game.roomId });
   }
   showLobbyUi();
+  setChatButtonVisible(false);
+  setChatVisible(false);
 });
 
 if (socket) {
@@ -549,6 +561,14 @@ emojiPicker?.addEventListener('click', (event) => {
   chatInput.focus();
 });
 
+chatToggleBtn?.addEventListener('click', () => {
+  setChatVisible(true);
+});
+
+chatCloseBtn?.addEventListener('click', () => {
+  setChatVisible(false);
+});
+
 // ============ SOCKET EVENTS ============
 if (socket) {
   socket.on('connect', () => {
@@ -576,6 +596,9 @@ if (socket) {
   socket.on('chatMessage', ({ sender, message }) => {
     if (!sender || !message) return;
     appendChatMessage(sender, message, false);
+    if (sender !== 'System' && chatPopup?.classList.contains('hidden')) {
+      chatToggleBtn?.classList.add('chat-notify');
+    }
   });
 
   socket.on('gameStart', (payload) => {
@@ -595,8 +618,8 @@ if (socket) {
     updatePlayerInfoDisplay();
     updateScoreCard();
     showActiveGameUi();
-    setChatVisible(true);
-    appendChatMessage('System', 'Chat is ready! Say hi with text or emojis.');
+    setChatButtonVisible(true);
+    appendChatMessage('System', 'Chat is ready! Tap the Chat button to open it.');
     gameOver = false;
     winningLine = [];
     winHighlightType = null;
