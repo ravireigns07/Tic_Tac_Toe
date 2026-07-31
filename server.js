@@ -125,7 +125,7 @@ io.on('connection', (socket) => {
   });
 
   // Code-based room creation (host)
-  socket.on('createRoom', ({ name }) => {
+  socket.on('createRoom', ({ name }, callback) => {
     const playerName = (name || '').trim() || `Player ${socket.id.slice(0, 4)}`;
     socket.data.name = playerName;
 
@@ -157,31 +157,42 @@ io.on('connection', (socket) => {
 
     socket.emit('roomCreated', { code, roomId });
     socket.emit('status', { message: 'Room created! Share the code with your friend.' });
+    if (typeof callback === 'function') {
+      callback({ success: true, code, roomId, message: 'Room created successfully.' });
+    }
   });
 
   // Code-based room joining (joiner)
-  socket.on('joinRoom', ({ code, name }) => {
+  socket.on('joinRoom', ({ code, name }, callback) => {
     const normalizedCode = (code || '').trim().toUpperCase().slice(0, 6);
     if (!normalizedCode) {
-      socket.emit('status', { message: 'Please enter a valid code.' });
+      const message = 'Please enter a valid code.';
+      socket.emit('status', { message });
+      if (typeof callback === 'function') callback({ success: false, message });
       return;
     }
 
     const roomId = roomCodes.get(normalizedCode);
     if (!roomId) {
-      socket.emit('status', { message: 'Invalid code. No room found.' });
+      const message = 'Invalid code. No room found.';
+      socket.emit('status', { message });
+      if (typeof callback === 'function') callback({ success: false, message });
       return;
     }
 
     const room = rooms.get(roomId);
     if (!room) {
-      socket.emit('status', { message: 'Room no longer exists.' });
+      const message = 'Room no longer exists.';
+      socket.emit('status', { message });
       roomCodes.delete(normalizedCode);
+      if (typeof callback === 'function') callback({ success: false, message });
       return;
     }
 
     if (room.status !== 'waiting') {
-      socket.emit('status', { message: 'Room is already full or game in progress.' });
+      const message = 'Room is already full or game in progress.';
+      socket.emit('status', { message });
+      if (typeof callback === 'function') callback({ success: false, message });
       return;
     }
 
@@ -234,6 +245,22 @@ io.on('connection', (socket) => {
       status: room.status,
       winner: room.winner,
       message: room.message,
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, message: 'Joined room successfully.', roomId, code: normalizedCode });
+    }
+  });
+
+  socket.on('sendChat', ({ roomId, message }) => {
+    const room = rooms.get(roomId);
+    if (!room || !message || typeof message !== 'string') return;
+    const player = room.players.find((entry) => entry.id === socket.id);
+    if (!player) return;
+    const senderName = player.name || 'Player';
+    io.to(roomId).emit('chatMessage', {
+      sender: senderName,
+      message: message.slice(0, 200),
     });
   });
 

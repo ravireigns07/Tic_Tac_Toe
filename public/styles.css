@@ -271,6 +271,93 @@ button:focus {
   gap: 12px;
 }
 
+.game-body {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 18px;
+  align-items: start;
+}
+
+.chat-panel {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+  padding: 18px;
+  min-height: 420px;
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.chat-header {
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.02em;
+}
+
+.chat-messages {
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 4px;
+  max-height: 300px;
+}
+
+.chat-message {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(30, 41, 59, 0.96);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.chat-message.own {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(96, 165, 250, 0.24);
+}
+
+.chat-message strong {
+  display: block;
+  font-size: 0.88rem;
+  color: #bfdbfe;
+}
+
+.chat-message span {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.chat-input-row input {
+  width: 100%;
+}
+
+.emoji-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.emoji-picker button {
+  width: 42px;
+  height: 42px;
+  font-size: 1.15rem;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.emoji-picker button:hover {
+  filter: brightness(1.1);
+}
+
 .cell {
   aspect-ratio: 1;
   border-radius: 18px;
@@ -335,6 +422,22 @@ button:focus {
   .score-player,
   .score-middle {
     width: 100%;
+  }
+
+  .game-body {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-panel {
+    min-height: auto;
+  }
+
+  .chat-input-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .chat-messages {
+    max-height: 220px;
   }
 
   .cell {

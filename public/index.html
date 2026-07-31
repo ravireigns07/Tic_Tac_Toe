@@ -62,7 +62,8 @@
             <span id="opponentScore">0</span>
           </div>
         </div>
-        <div class="board" id="board">
+        <div class="game-body">
+          <div class="board" id="board">
           <button class="cell" data-index="0"></button>
           <button class="cell" data-index="1"></button>
           <button class="cell" data-index="2"></button>
@@ -72,6 +73,23 @@
           <button class="cell" data-index="6"></button>
           <button class="cell" data-index="7"></button>
           <button class="cell" data-index="8"></button>
+        </div>
+
+          <aside id="chatPanel" class="chat-panel hidden">
+            <div class="chat-header">Game Chat</div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="emoji-picker" id="emojiPicker">
+              <button type="button">😀</button>
+              <button type="button">😂</button>
+              <button type="button">😍</button>
+              <button type="button">😎</button>
+              <button type="button">🎉</button>
+            </div>
+            <div class="chat-input-row">
+              <input id="chatInput" maxlength="120" placeholder="Send a message..." autocomplete="off" />
+              <button id="chatSendBtn">Send</button>
+            </div>
+          </aside>
         </div>
       </section>
     </main>
